@@ -39,6 +39,7 @@ import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.dependency.NpmPackage;
 import com.vaadin.flow.function.SerializableBiFunction;
 import com.vaadin.flow.internal.AnnotationReader;
+import com.vaadin.flow.server.DesignSystem;
 import com.vaadin.flow.theme.AbstractTheme;
 import com.vaadin.flow.theme.NoTheme;
 import com.vaadin.flow.theme.Theme;
@@ -63,6 +64,7 @@ class FullDependenciesScanner extends AbstractDependenciesScanner {
     private Set<String> scripts = new LinkedHashSet<>();
     private Set<CssData> cssData;
     private List<String> modules;
+    private String designSystem;
 
     private final Class<?> abstractTheme;
 
@@ -72,8 +74,7 @@ class FullDependenciesScanner extends AbstractDependenciesScanner {
      * Creates a new scanner instance which discovers all dependencies in the
      * classpath.
      *
-     * @param finder
-     *            a class finder
+     * @param finder a class finder
      */
     FullDependenciesScanner(ClassFinder finder) {
         this(finder, AnnotationReader::getAnnotationsFor);
@@ -119,7 +120,7 @@ class FullDependenciesScanner extends AbstractDependenciesScanner {
         cssData = discoverCss();
 
         discoverTheme();
-
+        this.designSystem = verifyDesignSystem();
         modules = calculateModules(regularModules, themeModules);
         getLogger().info("Visited {} classes. Took {} ms.", getClasses().size(),
                 System.currentTimeMillis() - start);
@@ -336,8 +337,29 @@ class FullDependenciesScanner extends AbstractDependenciesScanner {
             }
             return themes.isEmpty() ? null : themes.iterator().next();
         } catch (ClassNotFoundException exception) {
-            throw new IllegalStateException(
-                    "Could not load theme annotation class", exception);
+            throw new IllegalStateException("Could not load theme annotation class", exception);
+        }
+    }
+
+    private String verifyDesignSystem() {
+        try {
+            Class<? extends Annotation> loadedDesignSystemAnnotation = getFinder()
+                    .loadClass(DesignSystem.class.getName());
+
+            Set<Class<?>> annotatedClasses = getFinder().getAnnotatedClasses(loadedDesignSystemAnnotation);
+            Set<String> designSystems = annotatedClasses.stream()
+                    .flatMap(clazz -> annotationFinder.apply(clazz, loadedDesignSystemAnnotation).stream())
+                    .map(ann -> (String) invokeAnnotationMethod(ann, VALUE)).collect(Collectors.toSet());
+
+            if (designSystems.isEmpty()) {
+                return null;
+            } else if (designSystems.size() != 1) {
+                throw new IllegalStateException(
+                        "Using multiple different DesignSystem configurations is not " + "supported.");
+            }
+            return designSystems.iterator().next();
+        } catch (ClassNotFoundException exception) {
+            throw new IllegalStateException("Could not load theme annotation class", exception);
         }
     }
 
@@ -410,6 +432,11 @@ class FullDependenciesScanner extends AbstractDependenciesScanner {
     private Logger getLogger() {
         // Using short prefix so as npm output is more readable
         return LoggerFactory.getLogger("dev-updater");
+    }
+
+    @Override
+    public String getDesignSystem() {
+        return designSystem;
     }
 
 }

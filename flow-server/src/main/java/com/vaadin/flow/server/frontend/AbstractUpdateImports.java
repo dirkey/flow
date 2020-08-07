@@ -103,7 +103,7 @@ abstract class AbstractUpdateImports implements Runnable {
 
         lines.addAll(getThemeLines());
         lines.addAll(getCssLines());
-
+        lines.addAll(getDesignSystemLines());
         collectModules(lines);
 
         writeImportLines(lines);
@@ -155,7 +155,7 @@ abstract class AbstractUpdateImports implements Runnable {
      * @return the set of CSS files
      */
     protected abstract Set<CssData> getCss();
-
+    protected abstract String getDesignSystem();
     /**
      * Get theme lines for the generated imports file content.
      *
@@ -182,6 +182,16 @@ abstract class AbstractUpdateImports implements Runnable {
         return modules.stream()
                 .map(module -> resolveResource(module, isJsModule)).sorted()
                 .collect(Collectors.toList());
+    }
+    protected Collection<String> getDesignSystemLines() {
+        String designSystem = getDesignSystem();
+        if (designSystem == null){
+            return Collections.emptyList();
+        }
+        Collection<String> lines = new ArrayList<>();
+
+        lines.add("import 'Theme/"+designSystem+"/"+designSystem+".js';");
+        return lines;
     }
 
     protected Collection<String> getCssLines() {

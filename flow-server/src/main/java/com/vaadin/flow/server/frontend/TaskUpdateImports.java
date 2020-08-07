@@ -199,6 +199,10 @@ public class TaskUpdateImports extends NodeUpdater {
         protected Set<CssData> getCss() {
             return frontDeps.getCss();
         }
+        @Override
+        protected String getDesignSystem() {
+            return frontDeps.getDesignSystem();
+        }
 
         @Override
         protected Logger getLogger() {
@@ -258,6 +262,10 @@ public class TaskUpdateImports extends NodeUpdater {
             return set;
         }
 
+        @Override
+        protected String getDesignSystem() {
+            return null;
+        }
         @Override
         protected URL getResource(String name) {
             return finder.getResource(name);

@@ -40,30 +40,26 @@ public interface FrontendDependenciesScanner extends Serializable {
     class FrontendDependenciesScannerFactory {
 
         /**
-         * Produces scanner implementation based on {@code allDependenciesScan}
-         * value.
+         * Produces scanner implementation based on {@code allDependenciesScan} value.
          * <p>
          *
-         * @param allDependenciesScan
-         *            if {@code true} then full classpath scanning strategy is
-         *            used, otherwise byte scanning strategy is produced
-         * @param finder
-         *            a class finder
-         * @param generateEmbeddableWebComponents
-         *            checks {@code WebComponentExporter} classes for
-         *            dependencies if {@code true}, doesn't check otherwise
+         * @param allDependenciesScan             if {@code true} then full classpath
+         *                                        scanning strategy is used, otherwise
+         *                                        byte scanning strategy is produced
+         * @param finder                          a class finder
+         * @param generateEmbeddableWebComponents checks {@code WebComponentExporter}
+         *                                        classes for dependencies if
+         *                                        {@code true}, doesn't check otherwise
          * @return a scanner implementation strategy
          */
-        public FrontendDependenciesScanner createScanner(
-                boolean allDependenciesScan, ClassFinder finder,
+        public FrontendDependenciesScanner createScanner(boolean allDependenciesScan, ClassFinder finder,
                 boolean generateEmbeddableWebComponents) {
             if (allDependenciesScan) {
                 // this dep scanner can't distinguish embeddable web component
                 // frontend related annotations
                 return new FullDependenciesScanner(finder);
             } else {
-                return new FrontendDependencies(finder,
-                        generateEmbeddableWebComponents);
+                return new FrontendDependencies(finder, generateEmbeddableWebComponents);
             }
         }
     }
@@ -76,8 +72,8 @@ public interface FrontendDependenciesScanner extends Serializable {
     Map<String, String> getPackages();
 
     /**
-     * Get all ES6 modules needed for run the application. Modules that are
-     * theme dependencies are guaranteed to precede other modules in the result.
+     * Get all ES6 modules needed for run the application. Modules that are theme
+     * dependencies are guaranteed to precede other modules in the result.
      *
      * @return list of JS modules
      */
@@ -110,6 +106,8 @@ public interface FrontendDependenciesScanner extends Serializable {
      * @return the theme instance
      */
     AbstractTheme getTheme();
+
+    String getDesignSystem();
 
     /**
      * Get all Java classes considered when looking for used dependencies.

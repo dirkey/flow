@@ -111,7 +111,11 @@ public abstract class AbstractUpdateImportsTest extends NodeUpdateTestUtil {
         protected Collection<String> getThemeLines() {
             return Arrays.asList("theme-line-foo", "theme-line-bar");
         }
-
+@Override
+protected String getDesignSystem() {
+        // TODO Auto-generated method stub
+        return null;
+}
         @Override
         protected List<String> getModules() {
             return scanner.getModules();

@@ -41,6 +41,7 @@ import com.vaadin.flow.component.dependency.NpmPackage;
 import com.vaadin.flow.internal.ReflectTools;
 import com.vaadin.flow.router.HasErrorParameter;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.DesignSystem;
 import com.vaadin.flow.server.UIInitListener;
 import com.vaadin.flow.server.VaadinServiceInitListener;
 import com.vaadin.flow.theme.AbstractTheme;
@@ -62,6 +63,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     private AbstractTheme themeInstance;
     private final HashMap<String, String> packages = new HashMap<>();
     private final Set<String> visited = new HashSet<>();
+    private String designSystem;
 
     /**
      * Default Constructor.
@@ -99,6 +101,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
             }
             computeApplicationTheme();
             computePackages();
+            computeDesignSystem();
             long ms = (System.nanoTime() - start) / 1000000;
             log().info("Visited {} classes. Took {} ms.", visited.size(), ms);
         } catch (ClassNotFoundException | InstantiationException
@@ -314,6 +317,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
         }
     }
 
+
     /**
      * Finds the default theme and attaches it to the given endpoint as though
      * the endpoint had a {@code Theme} annotation.
@@ -366,6 +370,24 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
                         dependency, foundVersions, version);
             }
             packages.put(dependency, version);
+        }
+    }
+    private void computeDesignSystem() throws ClassNotFoundException, IOException {
+        FrontendAnnotatedClassVisitor designSystemVisitor = new FrontendAnnotatedClassVisitor(
+                getFinder(), DesignSystem.class.getName());
+
+        for (Class<?> component : getFinder()
+                .getAnnotatedClasses(DesignSystem.class.getName())) {
+            designSystemVisitor.visitClass(component.getName());
+        }
+
+        Set<String> designSystems = designSystemVisitor.getValues(VALUE);
+        if (designSystems.isEmpty()) {
+            this.designSystem = null;
+        } else if (designSystems.size() > 1) {
+            throw new IllegalArgumentException("Can't have multiple design systems");
+        } else {
+            this.designSystem = designSystems.iterator().next();
         }
     }
 
@@ -506,5 +528,10 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     @Override
     public String toString() {
         return endPoints.toString();
+    }
+
+    @Override
+    public String getDesignSystem() {
+        return designSystem;
     }
 }
