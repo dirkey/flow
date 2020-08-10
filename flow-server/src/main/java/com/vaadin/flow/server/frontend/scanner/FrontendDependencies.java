@@ -41,7 +41,7 @@ import com.vaadin.flow.component.dependency.NpmPackage;
 import com.vaadin.flow.internal.ReflectTools;
 import com.vaadin.flow.router.HasErrorParameter;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.DesignSystem;
+import com.vaadin.flow.server.ApplicationTheme;
 import com.vaadin.flow.server.UIInitListener;
 import com.vaadin.flow.server.VaadinServiceInitListener;
 import com.vaadin.flow.theme.AbstractTheme;
@@ -63,13 +63,12 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     private AbstractTheme themeInstance;
     private final HashMap<String, String> packages = new HashMap<>();
     private final Set<String> visited = new HashSet<>();
-    private String designSystem;
+    private String applicationTheme;
 
     /**
      * Default Constructor.
      *
-     * @param finder
-     *            the class finder
+     * @param finder the class finder
      */
     public FrontendDependencies(ClassFinder finder) {
         this(finder, true);
@@ -79,19 +78,16 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
      * Secondary constructor, which allows declaring whether embeddable web
      * components should be checked for resource dependencies.
      *
-     * @param finder
-     *            the class finder
-     * @param generateEmbeddableWebComponents
-     *            {@code true} checks the
-     *            {@link com.vaadin.flow.component.WebComponentExporter} classes
-     *            for dependencies. {@code true} is default for
-     *            {@link FrontendDependencies#FrontendDependencies(ClassFinder)}
+     * @param finder                          the class finder
+     * @param generateEmbeddableWebComponents {@code true} checks the
+     *                                        {@link com.vaadin.flow.component.WebComponentExporter}
+     *                                        classes for dependencies. {@code true}
+     *                                        is default for
+     *                                        {@link FrontendDependencies#FrontendDependencies(ClassFinder)}
      */
-    public FrontendDependencies(ClassFinder finder,
-            boolean generateEmbeddableWebComponents) {
+    public FrontendDependencies(ClassFinder finder, boolean generateEmbeddableWebComponents) {
         super(finder);
-        log().info(
-                "Scanning classes to find frontend configurations and dependencies...");
+        log().info("Scanning classes to find frontend configurations and dependencies...");
         long start = System.nanoTime();
         try {
             computeEndpoints();
@@ -101,13 +97,11 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
             }
             computeApplicationTheme();
             computePackages();
-            computeDesignSystem();
+            computeApplicationTheme();
             long ms = (System.nanoTime() - start) / 1000000;
             log().info("Visited {} classes. Took {} ms.", visited.size(), ms);
-        } catch (ClassNotFoundException | InstantiationException
-                | IllegalAccessException | IOException e) {
-            throw new IllegalStateException(
-                    "Unable to compute frontend dependencies", e);
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IOException e) {
+            throw new IllegalStateException("Unable to compute frontend dependencies", e);
         }
     }
 
@@ -122,8 +116,8 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     }
 
     /**
-     * Get all ES6 modules needed for run the application. Modules that are
-     * theme dependencies are guaranteed to precede other modules in the result.
+     * Get all ES6 modules needed for run the application. Modules that are theme
+     * dependencies are guaranteed to precede other modules in the result.
      *
      * @return list of JS modules
      */
@@ -213,8 +207,8 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
      * {@link Route}, {@link UIInitListener} instances, etc.) and update an
      * {@link EndPointData} object with the info found.
      * <p>
-     * At the same time when the root level view is visited, compute the theme
-     * to use and create its instance.
+     * At the same time when the root level view is visited, compute the theme to
+     * use and create its instance.
      *
      * @throws ClassNotFoundException
      * @throws IOException
@@ -222,24 +216,22 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     private void computeEndpoints() throws ClassNotFoundException, IOException {
         // Because of different classLoaders we need compare against class
         // references loaded by the specific class finder loader
-        Class<? extends Annotation> routeClass = getFinder()
-                .loadClass(Route.class.getName());
+        Class<? extends Annotation> routeClass = getFinder().loadClass(Route.class.getName());
         for (Class<?> route : getFinder().getAnnotatedClasses(routeClass)) {
             collectEndpoints(route);
         }
 
-        for (Class<?> initListener : getFinder().getSubTypesOf(
-                getFinder().loadClass(UIInitListener.class.getName()))) {
+        for (Class<?> initListener : getFinder().getSubTypesOf(getFinder().loadClass(UIInitListener.class.getName()))) {
             collectEndpoints(initListener);
         }
 
-        for (Class<?> initListener : getFinder().getSubTypesOf(getFinder()
-                .loadClass(VaadinServiceInitListener.class.getName()))) {
+        for (Class<?> initListener : getFinder()
+                .getSubTypesOf(getFinder().loadClass(VaadinServiceInitListener.class.getName()))) {
             collectEndpoints(initListener);
         }
 
-        for (Class<?> errorParameters : getFinder().getSubTypesOf(
-                getFinder().loadClass(HasErrorParameter.class.getName()))) {
+        for (Class<?> errorParameters : getFinder()
+                .getSubTypesOf(getFinder().loadClass(HasErrorParameter.class.getName()))) {
             collectEndpoints(errorParameters);
         }
     }
@@ -251,15 +243,15 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     }
 
     /*
-     * Visit all end-points and computes the theme for the application. It fails
-     * in the case that there are multiple themes for the application or in the
-     * case of Theme and NoTheme found in the application.
+     * Visit all end-points and computes the theme for the application. It fails in
+     * the case that there are multiple themes for the application or in the case of
+     * Theme and NoTheme found in the application.
      *
-     * If no theme is found and the application has endpoints, it uses lumo if
-     * found in the class-path
+     * If no theme is found and the application has endpoints, it uses lumo if found
+     * in the class-path
      */
-    private void computeApplicationTheme() throws ClassNotFoundException,
-            InstantiationException, IllegalAccessException, IOException {
+    private void computeApplicationTheme()
+            throws ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
 
         // Re-visit theme related classes, because they might be skipped
         // when they where already added to the visited list during other
@@ -275,25 +267,19 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
 
         Set<ThemeData> themes = endPoints.values().stream()
                 // consider only endPoints with theme information
-                .filter(data -> data.getTheme().getName() != null
-                        || data.getTheme().isNotheme())
+                .filter(data -> data.getTheme().getName() != null || data.getTheme().isNotheme())
                 .map(EndPointData::getTheme)
                 // Remove duplicates by returning a set
                 .collect(Collectors.toSet());
 
         if (themes.size() > 1) {
             String names = endPoints.values().stream()
-                    .filter(data -> data.getTheme().getName() != null
-                            || data.getTheme().isNotheme())
+                    .filter(data -> data.getTheme().getName() != null || data.getTheme().isNotheme())
                     .map(data -> "found '"
-                            + (data.getTheme().isNotheme()
-                                    ? NoTheme.class.getName()
-                                    : data.getTheme().getName())
+                            + (data.getTheme().isNotheme() ? NoTheme.class.getName() : data.getTheme().getName())
                             + "' in '" + data.getName() + "'")
                     .collect(Collectors.joining("\n      "));
-            throw new IllegalStateException(
-                    "\n Multiple Theme configuration is not supported:\n      "
-                            + names);
+            throw new IllegalStateException("\n Multiple Theme configuration is not supported:\n      " + names);
         }
 
         Class<? extends AbstractTheme> theme = null;
@@ -317,23 +303,20 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
         }
     }
 
-
     /**
-     * Finds the default theme and attaches it to the given endpoint as though
-     * the endpoint had a {@code Theme} annotation.
+     * Finds the default theme and attaches it to the given endpoint as though the
+     * endpoint had a {@code Theme} annotation.
      *
      * @return Lumo or null
      */
-    private Class<? extends AbstractTheme> getDefaultTheme()
-            throws IOException {
+    private Class<? extends AbstractTheme> getDefaultTheme() throws IOException {
         // No theme annotation found by the scanner
         final Class<? extends AbstractTheme> defaultTheme = getLumoTheme();
         // call visitClass on the default theme using the first available
         // endpoint. If not endpoint is available, default theme won't be
         // set.
         if (defaultTheme != null) {
-            Optional<EndPointData> endPointData = endPoints.values().stream()
-                    .findFirst();
+            Optional<EndPointData> endPointData = endPoints.values().stream().findFirst();
             if (endPointData.isPresent()) {
                 visitClass(defaultTheme.getName(), endPointData.get(), true);
             }
@@ -343,51 +326,48 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     }
 
     /**
-     * Visit all classes annotated with {@link NpmPackage} and update the list
-     * of dependencies and their versions.
+     * Visit all classes annotated with {@link NpmPackage} and update the list of
+     * dependencies and their versions.
      *
      * @throws ClassNotFoundException
      * @throws IOException
      */
     private void computePackages() throws ClassNotFoundException, IOException {
-        FrontendAnnotatedClassVisitor npmPackageVisitor = new FrontendAnnotatedClassVisitor(
-                getFinder(), NpmPackage.class.getName());
+        FrontendAnnotatedClassVisitor npmPackageVisitor = new FrontendAnnotatedClassVisitor(getFinder(),
+                NpmPackage.class.getName());
 
-        for (Class<?> component : getFinder()
-                .getAnnotatedClasses(NpmPackage.class.getName())) {
+        for (Class<?> component : getFinder().getAnnotatedClasses(NpmPackage.class.getName())) {
             npmPackageVisitor.visitClass(component.getName());
         }
 
         Set<String> dependencies = npmPackageVisitor.getValues(VALUE);
         for (String dependency : dependencies) {
-            Set<String> versions = npmPackageVisitor.getValuesForKey(VALUE,
-                    dependency, VERSION);
+            Set<String> versions = npmPackageVisitor.getValuesForKey(VALUE, dependency, VERSION);
             String version = versions.iterator().next();
             if (versions.size() > 1) {
                 String foundVersions = versions.toString();
-                log().warn(
-                        "Multiple npm versions for {} found:  {}. First version found '{}' will be considered.",
+                log().warn("Multiple npm versions for {} found:  {}. First version found '{}' will be considered.",
                         dependency, foundVersions, version);
             }
             packages.put(dependency, version);
         }
     }
-    private void computeDesignSystem() throws ClassNotFoundException, IOException {
-        FrontendAnnotatedClassVisitor designSystemVisitor = new FrontendAnnotatedClassVisitor(
-                getFinder(), DesignSystem.class.getName());
 
-        for (Class<?> component : getFinder()
-                .getAnnotatedClasses(DesignSystem.class.getName())) {
-            designSystemVisitor.visitClass(component.getName());
+    private void computeApplicationTheme() throws ClassNotFoundException, IOException {
+        FrontendAnnotatedClassVisitor applicationThemeVisitor = new FrontendAnnotatedClassVisitor(getFinder(),
+                ApplicationTheme.class.getName());
+
+        for (Class<?> component : getFinder().getAnnotatedClasses(ApplicationTheme.class.getName())) {
+            applicationThemeVisitor.visitClass(component.getName());
         }
 
-        Set<String> designSystems = designSystemVisitor.getValues(VALUE);
-        if (designSystems.isEmpty()) {
-            this.designSystem = null;
-        } else if (designSystems.size() > 1) {
+        Set<String> applicationThemes = applicationThemeVisitor.getValues(VALUE);
+        if (applicationThemes.isEmpty()) {
+            this.applicationTheme = null;
+        } else if (applicationThemes.size() > 1) {
             throw new IllegalArgumentException("Can't have multiple design systems");
         } else {
-            this.designSystem = designSystems.iterator().next();
+            this.applicationTheme = applicationThemes.iterator().next();
         }
     }
 
@@ -399,35 +379,28 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     /**
      * Visits all classes extending
      * {@link com.vaadin.flow.component.WebComponentExporter} or
-     * {@link WebComponentExporterFactory} and update an {@link EndPointData}
-     * object with the info found.
+     * {@link WebComponentExporterFactory} and update an {@link EndPointData} object
+     * with the info found.
      *
      * <p>
-     * The limitation with {@code WebComponentExporters} is that only one theme
-     * can be defined. If the more than one {@code @Theme} annotation is found
-     * on the exporters, {@code IllegalStateException} will be thrown. Having
-     * {@code @Theme} and {@code @NoTheme} is considered as two theme
-     * annotations. However, if no theme is found, {@code Lumo} is used, if
-     * available.
+     * The limitation with {@code WebComponentExporters} is that only one theme can
+     * be defined. If the more than one {@code @Theme} annotation is found on the
+     * exporters, {@code IllegalStateException} will be thrown. Having
+     * {@code @Theme} and {@code @NoTheme} is considered as two theme annotations.
+     * However, if no theme is found, {@code Lumo} is used, if available.
      *
-     * @param clazz
-     *            the exporter endpoint class
+     * @param clazz the exporter endpoint class
      *
-     * @throws ClassNotFoundException
-     *             if unable to load a class by class name
-     * @throws IOException
-     *             if unable to scan the class byte code
+     * @throws ClassNotFoundException if unable to load a class by class name
+     * @throws IOException            if unable to scan the class byte code
      */
     @SuppressWarnings("unchecked")
-    private void computeExporterEndpoints(Class<?> clazz)
-            throws ClassNotFoundException, IOException {
+    private void computeExporterEndpoints(Class<?> clazz) throws ClassNotFoundException, IOException {
         // Because of different classLoaders we need compare against class
         // references loaded by the specific class finder loader
-        Class<? extends Annotation> routeClass = getFinder()
-                .loadClass(Route.class.getName());
+        Class<? extends Annotation> routeClass = getFinder().loadClass(Route.class.getName());
         Class<?> exporterClass = getFinder().loadClass(clazz.getName());
-        Set<? extends Class<?>> exporterClasses = getFinder()
-                .getSubTypesOf(exporterClass);
+        Set<? extends Class<?>> exporterClasses = getFinder().getSubTypesOf(exporterClass);
 
         // if no exporters in the project, return
         if (exporterClasses.isEmpty()) {
@@ -439,19 +412,15 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
         for (Class<?> exporter : exporterClasses) {
             String exporterClassName = exporter.getName();
             EndPointData exporterData = new EndPointData(exporter);
-            exportedPoints.put(exporterClassName,
-                    visitClass(exporterClassName, exporterData, false));
+            exportedPoints.put(exporterClassName, visitClass(exporterClassName, exporterData, false));
 
             if (!Modifier.isAbstract(exporter.getModifiers())) {
                 Class<? extends Component> componentClass = (Class<? extends Component>) ReflectTools
                         .getGenericInterfaceType(exporter, exporterClass);
-                if (componentClass != null
-                        && !componentClass.isAnnotationPresent(routeClass)) {
+                if (componentClass != null && !componentClass.isAnnotationPresent(routeClass)) {
                     String componentClassName = componentClass.getName();
-                    EndPointData configurationData = new EndPointData(
-                            componentClass);
-                    exportedPoints.put(componentClassName, visitClass(
-                            componentClassName, configurationData, false));
+                    EndPointData configurationData = new EndPointData(componentClass);
+                    exportedPoints.put(componentClassName, visitClass(componentClassName, configurationData, false));
                 }
             }
         }
@@ -467,14 +436,12 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
      * @return
      * @throws IOException
      */
-    private EndPointData visitClass(String className, EndPointData endPoint,
-            boolean themeScope) throws IOException {
+    private EndPointData visitClass(String className, EndPointData endPoint, boolean themeScope) throws IOException {
 
         // In theme scope, we want to revisit already visited classes to have
         // theme modules collected separately (in turn required for module
         // sorting, #5729)
-        if (!isVisitable(className)
-                || (!themeScope && endPoint.getClasses().contains(className))) {
+        if (!isVisitable(className) || (!themeScope && endPoint.getClasses().contains(className))) {
             return endPoint;
         }
         endPoint.getClasses().add(className);
@@ -484,8 +451,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
             return endPoint;
         }
 
-        FrontendClassVisitor visitor = new FrontendClassVisitor(className,
-                endPoint, themeScope);
+        FrontendClassVisitor visitor = new FrontendClassVisitor(className, endPoint, themeScope);
         ClassReader cr = new ClassReader(url.openStream());
         cr.accept(visitor, ClassReader.EXPAND_FRAMES);
 
@@ -531,7 +497,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     }
 
     @Override
-    public String getDesignSystem() {
-        return designSystem;
+    public String getApplicationTheme() {
+        return applicationTheme;
     }
 }

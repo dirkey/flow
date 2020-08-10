@@ -69,479 +69,437 @@ import static org.junit.Assert.assertTrue;
 
 public abstract class AbstractUpdateImportsTest extends NodeUpdateTestUtil {
 
-    @Rule
-    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+        @Rule
+        public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-    @Rule
-    public ExpectedException exception = ExpectedException.none();
+        @Rule
+        public ExpectedException exception = ExpectedException.none();
 
-    private File tmpRoot;
-    private File generatedPath;
-    private File frontendDirectory;
-    private File nodeModulesPath;
-    private File loggerFile;
-    private UpdateImports updater;
+        private File tmpRoot;
+        private File generatedPath;
+        private File frontendDirectory;
+        private File nodeModulesPath;
+        private File loggerFile;
+        private UpdateImports updater;
 
-    private boolean useMockLog;
+        private boolean useMockLog;
 
-    private Logger logger = Mockito.mock(Logger.class);
+        private Logger logger = Mockito.mock(Logger.class);
 
-    private static final String ERROR_MSG = "foo-bar-baz";
+        private static final String ERROR_MSG = "foo-bar-baz";
 
-    private class UpdateImports extends AbstractUpdateImports {
+        private class UpdateImports extends AbstractUpdateImports {
 
-        private final ClassFinder finder;
-        private final FrontendDependenciesScanner scanner;
-        private List<String> resultingLines;
+                private final ClassFinder finder;
+                private final FrontendDependenciesScanner scanner;
+                private List<String> resultingLines;
 
-        UpdateImports(ClassFinder classFinder,
-                FrontendDependenciesScanner scanner, File npmDirectory,
-                File tokenFile) {
-            super(frontendDirectory, npmDirectory, generatedPath, tokenFile);
-            this.scanner = scanner;
-            finder = classFinder;
+                UpdateImports(ClassFinder classFinder, FrontendDependenciesScanner scanner, File npmDirectory,
+                                File tokenFile) {
+                        super(frontendDirectory, npmDirectory, generatedPath, tokenFile);
+                        this.scanner = scanner;
+                        finder = classFinder;
+                }
+
+                @Override
+                protected void writeImportLines(List<String> lines) {
+                        resultingLines = lines;
+                }
+
+                @Override
+                protected Collection<String> getThemeLines() {
+                        return Arrays.asList("theme-line-foo", "theme-line-bar");
+                }
+
+                @Override
+                protected String getApplicationTheme() {
+                        // TODO Auto-generated method stub
+                        return null;
+                }
+
+                @Override
+                protected List<String> getModules() {
+                        return scanner.getModules();
+                }
+
+                @Override
+                protected Set<String> getScripts() {
+                        return scanner.getScripts();
+                }
+
+                @Override
+                protected URL getResource(String name) {
+                        return finder.getResource(name);
+                }
+
+                @Override
+                protected Collection<String> getGeneratedModules() {
+                        return Arrays.asList("generated-modules-foo", "generated-modules-bar");
+                }
+
+                @Override
+                protected ThemeDefinition getThemeDefinition() {
+                        return scanner.getThemeDefinition();
+                }
+
+                @Override
+                protected AbstractTheme getTheme() {
+                        return scanner.getTheme();
+                }
+
+                @Override
+                protected Set<CssData> getCss() {
+                        return scanner.getCss();
+                }
+
+                @Override
+                protected Logger getLogger() {
+                        if (useMockLog) {
+                                return logger;
+                        } else {
+                                NodeUpdater updater = Mockito.mock(NodeUpdater.class);
+                                Mockito.doCallRealMethod().when(updater).log();
+                                return updater.log();
+                        }
+                }
+
+                @Override
+                protected String getImportsNotFoundMessage() {
+                        return ERROR_MSG;
+                }
         }
 
-        @Override
-        protected void writeImportLines(List<String> lines) {
-            resultingLines = lines;
+        @Before
+        public void setup() throws Exception {
+                tmpRoot = temporaryFolder.getRoot();
+
+                // Use a file for logs so as tests can assert the warnings shown to the
+                // user.
+                loggerFile = new File(tmpRoot, "test.log");
+                loggerFile.createNewFile();
+                // Setting a system property we make SimpleLogger to output to a file
+                System.setProperty(SimpleLogger.LOG_FILE_KEY, loggerFile.getAbsolutePath());
+                // re-init logger to get new configuration
+                initLogger();
+
+                frontendDirectory = new File(tmpRoot, DEFAULT_FRONTEND_DIR);
+                nodeModulesPath = new File(tmpRoot, NODE_MODULES);
+                generatedPath = new File(tmpRoot, DEFAULT_GENERATED_DIR);
+                File tokenFile = new File(tmpRoot, TOKEN_FILE);
+
+                ClassFinder classFinder = getClassFinder();
+                updater = new UpdateImports(classFinder, getScanner(classFinder), tmpRoot, tokenFile);
+                assertTrue(nodeModulesPath.mkdirs());
+                createExpectedImports(frontendDirectory, nodeModulesPath);
+                assertTrue(new File(nodeModulesPath, FLOW_NPM_PACKAGE_NAME + "ExampleConnector.js").exists());
         }
 
-        @Override
-        protected Collection<String> getThemeLines() {
-            return Arrays.asList("theme-line-foo", "theme-line-bar");
-        }
-@Override
-protected String getDesignSystem() {
-        // TODO Auto-generated method stub
-        return null;
-}
-        @Override
-        protected List<String> getModules() {
-            return scanner.getModules();
+        @After
+        public void tearDown() throws Exception {
+                // re-init logger to reset to default
+                System.clearProperty(SimpleLogger.LOG_FILE_KEY);
+                initLogger();
         }
 
-        @Override
-        protected Set<String> getScripts() {
-            return scanner.getScripts();
+        protected abstract FrontendDependenciesScanner getScanner(ClassFinder finder);
+
+        private void initLogger() throws Exception, SecurityException {
+                // init method is protected
+                Method method = SimpleLogger.class.getDeclaredMethod("init");
+                method.setAccessible(true);
+                method.invoke(null);
         }
 
-        @Override
-        protected URL getResource(String name) {
-            return finder.getResource(name);
+        @Test
+        public void importsFilesAreNotFound_throws() {
+                deleteExpectedImports(frontendDirectory, nodeModulesPath);
+                exception.expect(IllegalStateException.class);
+                updater.run();
         }
 
-        @Override
-        protected Collection<String> getGeneratedModules() {
-            return Arrays.asList("generated-modules-foo",
-                    "generated-modules-bar");
+        @Test
+        public void getModuleLines_npmPackagesDontExist_logExplanation() {
+                useMockLog = true;
+                Mockito.when(logger.isInfoEnabled()).thenReturn(true);
+                boolean atLeastOneRemoved = false;
+                for (String imprt : getExpectedImports()) {
+                        if (imprt.startsWith("@vaadin") && imprt.endsWith(".js")) {
+                                assertTrue(resolveImportFile(nodeModulesPath, nodeModulesPath, imprt).delete());
+                                atLeastOneRemoved = true;
+                        }
+                }
+                assertTrue(atLeastOneRemoved);
+                updater.run();
+
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                Mockito.verify(logger).info(captor.capture());
+
+                Assert.assertThat(captor.getValue(),
+                                CoreMatchers.allOf(CoreMatchers.containsString("@vaadin/vaadin-lumo-styles/spacing.js"),
+                                                CoreMatchers.containsString(ERROR_MSG)));
         }
 
-        @Override
-        protected ThemeDefinition getThemeDefinition() {
-            return scanner.getThemeDefinition();
+        @Test
+        public void getModuleLines_oneFrontendDependencyDoesntExist_throwExceptionAndlogExplanation() {
+                useMockLog = true;
+                Mockito.when(logger.isInfoEnabled()).thenReturn(true);
+
+                String fooFileName = "./foo.js";
+                assertFileRemoved(fooFileName, frontendDirectory);
+
+                try {
+                        updater.run();
+                        Assert.fail("Execute should have failed with missing file");
+                } catch (IllegalStateException e) {
+                        assertThat(e.getMessage(), CoreMatchers
+                                        .containsString(getFormattedFrontendErrorMessage(Sets.newSet(fooFileName))));
+                }
+
         }
 
-        @Override
-        protected AbstractTheme getTheme() {
-            return scanner.getTheme();
+        @Test
+        public void getModuleLines_oneFrontendDependencyAndFrontendDirectoryDontExist_throwExceptionAdvisingUserToRunPrepareFrontend()
+                        throws Exception {
+                ClassFinder classFinder = getClassFinder();
+                updater = new UpdateImports(classFinder, getScanner(classFinder), tmpRoot, null);
+
+                useMockLog = true;
+                Mockito.when(logger.isInfoEnabled()).thenReturn(true);
+
+                Files.move(frontendDirectory.toPath(), new File(tmpRoot, "_frontend").toPath());
+
+                try {
+                        updater.run();
+                        Assert.fail("Execute should have failed with advice to run `prepare-frontend`");
+                } catch (IllegalStateException e) {
+                        assertThat(e.getMessage(), CoreMatchers
+                                        .containsString("Unable to locate frontend resources and missing token file. "
+                                                        + "Please run the `prepare-frontend` Vaadin plugin goal before deploying the application"));
+                }
         }
 
-        @Override
-        protected Set<CssData> getCss() {
-            return scanner.getCss();
+        @Test
+        public void getModuleLines_multipleFrontendDependencyDoesntExist_throwExceptionAndlogExplanation() {
+                useMockLog = true;
+                Mockito.when(logger.isInfoEnabled()).thenReturn(true);
+
+                String localTemplateFileName = "./local-template.js";
+                String fooFileName = "./foo.js";
+
+                assertFileRemoved(localTemplateFileName, frontendDirectory);
+                assertFileRemoved(fooFileName, frontendDirectory);
+
+                try {
+                        updater.run();
+                        Assert.fail("Execute should have failed with missing files");
+                } catch (IllegalStateException e) {
+                        assertThat(e.getMessage(), CoreMatchers.containsString(getFormattedFrontendErrorMessage(
+                                        Sets.newSet(localTemplateFileName, fooFileName))));
+                }
+
         }
 
-        @Override
-        protected Logger getLogger() {
-            if (useMockLog) {
-                return logger;
-            } else {
-                NodeUpdater updater = Mockito.mock(NodeUpdater.class);
-                Mockito.doCallRealMethod().when(updater).log();
-                return updater.log();
-            }
+        private void assertFileRemoved(String fileName, File directory) {
+                assertTrue(String.format("File `%s` was not removed from, or does not exist in, `%s`", fileName,
+                                directory), resolveImportFile(directory, directory, fileName).delete());
         }
 
-        @Override
-        protected String getImportsNotFoundMessage() {
-            return ERROR_MSG;
-        }
-    }
+        private String getFormattedFrontendErrorMessage(Set<String> resourcesNotFound) {
+                String prefix = "Failed to find the following files: ";
 
-    @Before
-    public void setup() throws Exception {
-        tmpRoot = temporaryFolder.getRoot();
+                String suffix = String.format("%n  Locations searched were:" + "%n      - `%s` in this project"
+                                + "%n      - `%s` in included JARs"
+                                + "%n%n  Please, double check that those files exist. If you use a custom directory "
+                                + "for your resource files instead of default "
+                                + "`frontend` folder then make sure you it's correctly configured "
+                                + "(e.g. set '%s' property)", frontendDirectory.getPath(),
+                                Constants.RESOURCES_FRONTEND_DEFAULT, FrontendUtils.PARAM_FRONTEND_DIR);
 
-        // Use a file for logs so as tests can assert the warnings shown to the
-        // user.
-        loggerFile = new File(tmpRoot, "test.log");
-        loggerFile.createNewFile();
-        // Setting a system property we make SimpleLogger to output to a file
-        System.setProperty(SimpleLogger.LOG_FILE_KEY,
-                loggerFile.getAbsolutePath());
-        // re-init logger to get new configuration
-        initLogger();
-
-        frontendDirectory = new File(tmpRoot, DEFAULT_FRONTEND_DIR);
-        nodeModulesPath = new File(tmpRoot, NODE_MODULES);
-        generatedPath = new File(tmpRoot, DEFAULT_GENERATED_DIR);
-        File tokenFile = new File(tmpRoot, TOKEN_FILE);
-
-        ClassFinder classFinder = getClassFinder();
-        updater = new UpdateImports(classFinder, getScanner(classFinder),
-                tmpRoot, tokenFile);
-        assertTrue(nodeModulesPath.mkdirs());
-        createExpectedImports(frontendDirectory, nodeModulesPath);
-        assertTrue(new File(nodeModulesPath,
-                FLOW_NPM_PACKAGE_NAME + "ExampleConnector.js").exists());
-    }
-
-    @After
-    public void tearDown() throws Exception {
-        // re-init logger to reset to default
-        System.clearProperty(SimpleLogger.LOG_FILE_KEY);
-        initLogger();
-    }
-
-    protected abstract FrontendDependenciesScanner getScanner(
-            ClassFinder finder);
-
-    private void initLogger() throws Exception, SecurityException {
-        // init method is protected
-        Method method = SimpleLogger.class.getDeclaredMethod("init");
-        method.setAccessible(true);
-        method.invoke(null);
-    }
-
-    @Test
-    public void importsFilesAreNotFound_throws() {
-        deleteExpectedImports(frontendDirectory, nodeModulesPath);
-        exception.expect(IllegalStateException.class);
-        updater.run();
-    }
-
-    @Test
-    public void getModuleLines_npmPackagesDontExist_logExplanation() {
-        useMockLog = true;
-        Mockito.when(logger.isInfoEnabled()).thenReturn(true);
-        boolean atLeastOneRemoved = false;
-        for (String imprt : getExpectedImports()) {
-            if (imprt.startsWith("@vaadin") && imprt.endsWith(".js")) {
-                assertTrue(resolveImportFile(nodeModulesPath, nodeModulesPath,
-                        imprt).delete());
-                atLeastOneRemoved = true;
-            }
-        }
-        assertTrue(atLeastOneRemoved);
-        updater.run();
-
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        Mockito.verify(logger).info(captor.capture());
-
-        Assert.assertThat(captor.getValue(),
-                CoreMatchers.allOf(
-                        CoreMatchers.containsString(
-                                "@vaadin/vaadin-lumo-styles/spacing.js"),
-                        CoreMatchers.containsString(ERROR_MSG)));
-    }
-
-    @Test
-    public void getModuleLines_oneFrontendDependencyDoesntExist_throwExceptionAndlogExplanation() {
-        useMockLog = true;
-        Mockito.when(logger.isInfoEnabled()).thenReturn(true);
-
-        String fooFileName = "./foo.js";
-        assertFileRemoved(fooFileName, frontendDirectory);
-
-        try {
-            updater.run();
-            Assert.fail("Execute should have failed with missing file");
-        } catch (IllegalStateException e) {
-            assertThat(e.getMessage(),
-                    CoreMatchers
-                            .containsString(getFormattedFrontendErrorMessage(
-                                    Sets.newSet(fooFileName))));
+                return String.format("%n%n  %s%n      - %s%n  %s%n%n", prefix,
+                                String.join("\n      - ", resourcesNotFound), suffix);
         }
 
-    }
+        @Test
+        public void generateLines_resultingLinesContainsThemeLinesAndExpectedImportsAndCssLinesAndGeneratedImportsAndLoggerReports()
+                        throws Exception {
+                List<String> expectedLines = new ArrayList<>(Arrays.asList("theme-line-foo", "theme-line-bar"));
+                getExpectedImports().stream().filter(imp -> imp.equals("/foo.css"))
+                                .forEach(imp -> expectedLines.add("import '" + addWebpackPrefix(imp) + "';"));
 
-    @Test
-    public void getModuleLines_oneFrontendDependencyAndFrontendDirectoryDontExist_throwExceptionAdvisingUserToRunPrepareFrontend() throws Exception {
-        ClassFinder classFinder = getClassFinder();
-        updater = new UpdateImports(classFinder, getScanner(classFinder),
-                tmpRoot, null);
+                // An import without `.js` extension
+                expectedLines.add("import '@vaadin/vaadin-mixed-component/theme/lumo/vaadin-something-else';");
+                // An import not found in node_modules
+                expectedLines.add("import 'unresolved/component';");
 
-        useMockLog = true;
-        Mockito.when(logger.isInfoEnabled()).thenReturn(true);
+                expectedLines.add("import $css_0 from '@vaadin/vaadin-mixed-component/bar.css';");
+                expectedLines.add("import $css_1 from 'Frontend/foo.css';");
+                expectedLines.add("import $css_2 from 'Frontend/foo.css';");
+                expectedLines.add("import $css_3 from 'Frontend/foo.css';");
+                expectedLines.add("import $css_4 from 'Frontend/foo.css';");
+                expectedLines.add("import $css_5 from 'Frontend/foo.css';");
+                expectedLines.add("import $css_6 from 'Frontend/foo.css';");
+                expectedLines.add("addCssBlock(`<custom-style><style>${$css_0}</style></custom-style>`);");
+                expectedLines.add("addCssBlock(`<custom-style><style>${$css_1}</style></custom-style>`);");
+                expectedLines.add(
+                                "addCssBlock(`<custom-style><style include=\"bar\">${$css_2}</style></custom-style>`);");
+                expectedLines.add(
+                                "addCssBlock(`<dom-module id=\"baz\"><template><style>${$css_3}</style></template></dom-module>`);");
+                expectedLines.add(
+                                "addCssBlock(`<dom-module id=\"baz\"><template><style include=\"bar\">${$css_4}</style></template></dom-module>`);");
+                expectedLines.add(
+                                "addCssBlock(`<dom-module id=\"flow_css_mod_5\" theme-for=\"foo-bar\"><template><style>${$css_5}</style></template></dom-module>`);");
+                expectedLines.add(
+                                "addCssBlock(`<dom-module id=\"flow_css_mod_6\" theme-for=\"foo-bar\"><template><style include=\"bar\">${$css_6}</style></template></dom-module>`);");
 
-        Files.move(frontendDirectory.toPath(),
-                new File(tmpRoot, "_frontend").toPath());
+                expectedLines.add("import 'generated-modules-foo';");
+                expectedLines.add("import 'generated-modules-bar';");
 
-        try {
-            updater.run();
-            Assert.fail("Execute should have failed with advice to run `prepare-frontend`");
-        } catch (IllegalStateException e) {
-            assertThat(e.getMessage(), CoreMatchers.containsString(
-                    "Unable to locate frontend resources and missing token file. "
-                            + "Please run the `prepare-frontend` Vaadin plugin goal before deploying the application"));
-        }
-    }
+                updater.run();
 
-    @Test
-    public void getModuleLines_multipleFrontendDependencyDoesntExist_throwExceptionAndlogExplanation() {
-        useMockLog = true;
-        Mockito.when(logger.isInfoEnabled()).thenReturn(true);
+                for (String line : expectedLines) {
+                        Assert.assertTrue("\n" + line + " IS NOT FOUND IN: \n" + updater.resultingLines,
+                                        updater.resultingLines.contains(line));
+                }
 
-        String localTemplateFileName = "./local-template.js";
-        String fooFileName = "./foo.js";
+                assertTrue(loggerFile.exists());
 
-        assertFileRemoved(localTemplateFileName, frontendDirectory);
-        assertFileRemoved(fooFileName, frontendDirectory);
+                String output = FileUtils.readFileToString(loggerFile, StandardCharsets.UTF_8)
+                                // fix for windows
+                                .replace("\r", "");
 
-        try {
-            updater.run();
-            Assert.fail("Execute should have failed with missing files");
-        } catch (IllegalStateException e) {
-            assertThat(e.getMessage(), CoreMatchers
-                    .containsString(getFormattedFrontendErrorMessage(
-                            Sets.newSet(localTemplateFileName, fooFileName))));
-        }
+                Assert.assertThat(output, CoreMatchers.containsString(
+                                "changing 'frontend://frontend-p3-template.js' to './frontend-p3-template.js'"));
+                Assert.assertThat(output, CoreMatchers
+                                .containsString("Use the './' prefix for files in JAR files: 'ExampleConnector.js'"));
+                Assert.assertThat(output, CoreMatchers.containsString("Use the './' prefix for files in the '"
+                                + frontendDirectory.getPath()
+                                + "' folder: 'vaadin-mixed-component/theme/lumo/vaadin-mixed-component.js'"));
 
-    }
+                // Using regex match because of the ➜ character in TC
+                Assert.assertThat(output, CoreMatchers.containsString(
+                                "Failed to find the following imports in the `node_modules` tree:\n      - unresolved/component"));
 
-    private void assertFileRemoved(String fileName, File directory) {
-        assertTrue(String.format(
-                "File `%s` was not removed from, or does not exist in, `%s`",
-                fileName, directory),
-                resolveImportFile(directory, directory, fileName).delete());
-    }
-
-    private String getFormattedFrontendErrorMessage(
-            Set<String> resourcesNotFound) {
-        String prefix = "Failed to find the following files: ";
-
-        String suffix = String.format("%n  Locations searched were:"
-                + "%n      - `%s` in this project"
-                + "%n      - `%s` in included JARs"
-                + "%n%n  Please, double check that those files exist. If you use a custom directory "
-                + "for your resource files instead of default "
-                + "`frontend` folder then make sure you it's correctly configured "
-                + "(e.g. set '%s' property)", frontendDirectory.getPath(),
-                Constants.RESOURCES_FRONTEND_DEFAULT,
-                FrontendUtils.PARAM_FRONTEND_DIR);
-         
-        return String.format("%n%n  %s%n      - %s%n  %s%n%n", prefix,
-                String.join("\n      - ", resourcesNotFound), suffix);
-    }
-
-    @Test
-    public void generateLines_resultingLinesContainsThemeLinesAndExpectedImportsAndCssLinesAndGeneratedImportsAndLoggerReports()
-            throws Exception {
-        List<String> expectedLines = new ArrayList<>(
-                Arrays.asList("theme-line-foo", "theme-line-bar"));
-        getExpectedImports().stream().filter(imp -> imp.equals("/foo.css"))
-                .forEach(imp -> expectedLines
-                        .add("import '" + addWebpackPrefix(imp) + "';"));
-
-        // An import without `.js` extension
-        expectedLines.add(
-                "import '@vaadin/vaadin-mixed-component/theme/lumo/vaadin-something-else';");
-        // An import not found in node_modules
-        expectedLines.add("import 'unresolved/component';");
-
-        expectedLines.add(
-                "import $css_0 from '@vaadin/vaadin-mixed-component/bar.css';");
-        expectedLines.add("import $css_1 from 'Frontend/foo.css';");
-        expectedLines.add("import $css_2 from 'Frontend/foo.css';");
-        expectedLines.add("import $css_3 from 'Frontend/foo.css';");
-        expectedLines.add("import $css_4 from 'Frontend/foo.css';");
-        expectedLines.add("import $css_5 from 'Frontend/foo.css';");
-        expectedLines.add("import $css_6 from 'Frontend/foo.css';");
-        expectedLines.add(
-                "addCssBlock(`<custom-style><style>${$css_0}</style></custom-style>`);");
-        expectedLines.add(
-                "addCssBlock(`<custom-style><style>${$css_1}</style></custom-style>`);");
-        expectedLines.add(
-                "addCssBlock(`<custom-style><style include=\"bar\">${$css_2}</style></custom-style>`);");
-        expectedLines.add(
-                "addCssBlock(`<dom-module id=\"baz\"><template><style>${$css_3}</style></template></dom-module>`);");
-        expectedLines.add(
-                "addCssBlock(`<dom-module id=\"baz\"><template><style include=\"bar\">${$css_4}</style></template></dom-module>`);");
-        expectedLines.add(
-                "addCssBlock(`<dom-module id=\"flow_css_mod_5\" theme-for=\"foo-bar\"><template><style>${$css_5}</style></template></dom-module>`);");
-        expectedLines.add(
-                "addCssBlock(`<dom-module id=\"flow_css_mod_6\" theme-for=\"foo-bar\"><template><style include=\"bar\">${$css_6}</style></template></dom-module>`);");
-
-        expectedLines.add("import 'generated-modules-foo';");
-        expectedLines.add("import 'generated-modules-bar';");
-
-        updater.run();
-
-        for (String line : expectedLines) {
-            Assert.assertTrue(
-                    "\n" + line + " IS NOT FOUND IN: \n"
-                            + updater.resultingLines,
-                    updater.resultingLines.contains(line));
+                Assert.assertThat(output, CoreMatchers.not(CoreMatchers.containsString(
+                                "changing 'frontend://foo-dir/javascript-lib.js' to './foo-dir/javascript-lib.js'")));
         }
 
-        assertTrue(loggerFile.exists());
-
-        String output = FileUtils
-                .readFileToString(loggerFile, StandardCharsets.UTF_8)
-                // fix for windows
-                .replace("\r", "");
-
-        Assert.assertThat(output, CoreMatchers.containsString(
-                "changing 'frontend://frontend-p3-template.js' to './frontend-p3-template.js'"));
-        Assert.assertThat(output, CoreMatchers.containsString(
-                "Use the './' prefix for files in JAR files: 'ExampleConnector.js'"));
-        Assert.assertThat(output, CoreMatchers
-                .containsString("Use the './' prefix for files in the '"
-                        + frontendDirectory.getPath()
-                        + "' folder: 'vaadin-mixed-component/theme/lumo/vaadin-mixed-component.js'"));
-
-        // Using regex match because of the ➜ character in TC
-        Assert.assertThat(output, CoreMatchers.containsString(
-                "Failed to find the following imports in the `node_modules` tree:\n      - unresolved/component"));
-
-        Assert.assertThat(output, CoreMatchers.not(CoreMatchers.containsString(
-                "changing 'frontend://foo-dir/javascript-lib.js' to './foo-dir/javascript-lib.js'")));
-    }
-
-    @Test
-    public void cssFileNotFound_throws() {
-        assertTrue(resolveImportFile(frontendDirectory, nodeModulesPath,
-                "@vaadin/vaadin-mixed-component/bar.css").delete());
-        exception.expect(IllegalStateException.class);
-        updater.run();
-    }
-
-    @Test
-    public void generate_containsLumoThemeFiles() {
-        updater.run();
-
-        assertContainsImports(true, "@vaadin/vaadin-lumo-styles/color.js",
-                "@vaadin/vaadin-lumo-styles/typography.js",
-                "@vaadin/vaadin-lumo-styles/sizing.js",
-                "@vaadin/vaadin-lumo-styles/spacing.js",
-                "@vaadin/vaadin-lumo-styles/style.js",
-                "@vaadin/vaadin-lumo-styles/icons.js");
-    }
-
-    // flow #6408
-    @Test
-    public void jsModuleOnRouterLayout_shouldBe_addedAfterLumoStyles() {
-        updater.run();
-
-        assertContainsImports(true, "Frontend/common-js-file.js");
-
-        assertImportOrder("@vaadin/vaadin-lumo-styles/color.js",
-                "Frontend/common-js-file.js");
-        assertImportOrder(
-                "@vaadin/vaadin-mixed-component/theme/lumo/vaadin-something-else.js",
-                "Frontend/common-js-file.js");
-    }
-
-    @Test
-    public void jsModulesOrderIsPreservedAnsAfterJsModules() {
-        updater.run();
-
-        assertImportOrder("jsmodule/g.js", "javascript/a.js", "javascript/b.js",
-                "javascript/c.js");
-    }
-
-    @Route(value = "")
-    private static class MainView extends Component {
-        NodeTestComponents.TranslatedImports translatedImports;
-        NodeTestComponents.LocalP3Template localP3Template;
-        NodeTestComponents.JavaScriptOrder javaScriptOrder;
-    }
-
-    @Test
-    public void assertFullSortOrder() throws MalformedURLException {
-        Class[] testClasses = { MainView.class,
-                NodeTestComponents.TranslatedImports.class,
-                NodeTestComponents.LocalP3Template.class,
-                NodeTestComponents.JavaScriptOrder.class };
-        ClassFinder classFinder = getClassFinder(testClasses);
-
-        updater = new UpdateImports(classFinder, getScanner(classFinder),
-                tmpRoot, new File(tmpRoot, TOKEN_FILE));
-        updater.run();
-
-        // Imports are collected as
-        // - theme and css
-        // - JsModules (external e.g. in node_modules/)
-        // - JavaScript
-        // - Generated webcompoents
-        // - JsModules (internal e.g. in frontend/)
-        List<String> expectedImports = new ArrayList<>();
-        expectedImports.addAll(updater.getThemeLines());
-
-        getAnntotationsAsStream(JsModule.class, testClasses)
-                .map(JsModule::value).map(this::updateToImport).sorted()
-                .forEach(expectedImports::add);
-        getAnntotationsAsStream(JavaScript.class, testClasses)
-                .map(JavaScript::value).map(this::updateToImport).sorted()
-                .forEach(expectedImports::add);
-
-        List<String> internals = expectedImports.stream()
-                .filter(importValue -> importValue
-                        .contains(FrontendUtils.WEBPACK_PREFIX_ALIAS))
-                .sorted().collect(Collectors.toList());
-        updater.getGeneratedModules().stream().map(this::updateToImport)
-                .forEach(expectedImports::add);
-        // Remove internals from the full list
-        expectedImports.removeAll(internals);
-        // Add internals to end of list
-        expectedImports.addAll(internals);
-
-        Assert.assertEquals(expectedImports, updater.resultingLines);
-    }
-
-    private <T extends Annotation> Stream<T> getAnntotationsAsStream(
-            Class<T> annotation, Class<?>... classes) {
-        Stream<T> stream = Stream.empty();
-        for (Class<?> clazz : classes) {
-            stream = Stream.concat(stream,
-                    Stream.of(clazz.getAnnotationsByType(annotation)));
+        @Test
+        public void cssFileNotFound_throws() {
+                assertTrue(resolveImportFile(frontendDirectory, nodeModulesPath,
+                                "@vaadin/vaadin-mixed-component/bar.css").delete());
+                exception.expect(IllegalStateException.class);
+                updater.run();
         }
-        return stream;
-    }
 
-    private String updateToImport(String value) {
-        if (value.startsWith("./")) {
-            value = value.replace("./", FrontendUtils.WEBPACK_PREFIX_ALIAS);
-        }
-        return String.format("import '%s';", value);
-    }
+        @Test
+        public void generate_containsLumoThemeFiles() {
+                updater.run();
 
-    private void assertContainsImports(boolean contains, String... imports) {
-        for (String line : imports) {
-            boolean result = updater.resultingLines
-                    .contains("import '" + addWebpackPrefix(line) + "';");
-            String message = "\n  " + (contains ? "NOT " : "") + "FOUND '"
-                    + line + " IN: \n" + updater.resultingLines;
-            if (contains) {
-                assertTrue(message, result);
-            } else {
-                assertFalse(message, result);
-            }
+                assertContainsImports(true, "@vaadin/vaadin-lumo-styles/color.js",
+                                "@vaadin/vaadin-lumo-styles/typography.js", "@vaadin/vaadin-lumo-styles/sizing.js",
+                                "@vaadin/vaadin-lumo-styles/spacing.js", "@vaadin/vaadin-lumo-styles/style.js",
+                                "@vaadin/vaadin-lumo-styles/icons.js");
         }
-    }
 
-    private void assertImportOrder(String... imports) {
-        int curIndex = -1;
-        for (String line : imports) {
-            String prefixed = addWebpackPrefix(line);
-            int nextIndex = updater.resultingLines
-                    .indexOf("import '" + prefixed + "';");
-            assertTrue("import '" + prefixed + "' not found", nextIndex != -1);
-            assertTrue("import '" + prefixed + "' appears in the wrong order",
-                    curIndex <= nextIndex);
-            curIndex = nextIndex;
+        // flow #6408
+        @Test
+        public void jsModuleOnRouterLayout_shouldBe_addedAfterLumoStyles() {
+                updater.run();
+
+                assertContainsImports(true, "Frontend/common-js-file.js");
+
+                assertImportOrder("@vaadin/vaadin-lumo-styles/color.js", "Frontend/common-js-file.js");
+                assertImportOrder("@vaadin/vaadin-mixed-component/theme/lumo/vaadin-something-else.js",
+                                "Frontend/common-js-file.js");
         }
-    }
+
+        @Test
+        public void jsModulesOrderIsPreservedAnsAfterJsModules() {
+                updater.run();
+
+                assertImportOrder("jsmodule/g.js", "javascript/a.js", "javascript/b.js", "javascript/c.js");
+        }
+
+        @Route(value = "")
+        private static class MainView extends Component {
+                NodeTestComponents.TranslatedImports translatedImports;
+                NodeTestComponents.LocalP3Template localP3Template;
+                NodeTestComponents.JavaScriptOrder javaScriptOrder;
+        }
+
+        @Test
+        public void assertFullSortOrder() throws MalformedURLException {
+                Class[] testClasses = { MainView.class, NodeTestComponents.TranslatedImports.class,
+                                NodeTestComponents.LocalP3Template.class, NodeTestComponents.JavaScriptOrder.class };
+                ClassFinder classFinder = getClassFinder(testClasses);
+
+                updater = new UpdateImports(classFinder, getScanner(classFinder), tmpRoot,
+                                new File(tmpRoot, TOKEN_FILE));
+                updater.run();
+
+                // Imports are collected as
+                // - theme and css
+                // - JsModules (external e.g. in node_modules/)
+                // - JavaScript
+                // - Generated webcompoents
+                // - JsModules (internal e.g. in frontend/)
+                List<String> expectedImports = new ArrayList<>();
+                expectedImports.addAll(updater.getThemeLines());
+
+                getAnntotationsAsStream(JsModule.class, testClasses).map(JsModule::value).map(this::updateToImport)
+                                .sorted().forEach(expectedImports::add);
+                getAnntotationsAsStream(JavaScript.class, testClasses).map(JavaScript::value).map(this::updateToImport)
+                                .sorted().forEach(expectedImports::add);
+
+                List<String> internals = expectedImports.stream()
+                                .filter(importValue -> importValue.contains(FrontendUtils.WEBPACK_PREFIX_ALIAS))
+                                .sorted().collect(Collectors.toList());
+                updater.getGeneratedModules().stream().map(this::updateToImport).forEach(expectedImports::add);
+                // Remove internals from the full list
+                expectedImports.removeAll(internals);
+                // Add internals to end of list
+                expectedImports.addAll(internals);
+
+                Assert.assertEquals(expectedImports, updater.resultingLines);
+        }
+
+        private <T extends Annotation> Stream<T> getAnntotationsAsStream(Class<T> annotation, Class<?>... classes) {
+                Stream<T> stream = Stream.empty();
+                for (Class<?> clazz : classes) {
+                        stream = Stream.concat(stream, Stream.of(clazz.getAnnotationsByType(annotation)));
+                }
+                return stream;
+        }
+
+        private String updateToImport(String value) {
+                if (value.startsWith("./")) {
+                        value = value.replace("./", FrontendUtils.WEBPACK_PREFIX_ALIAS);
+                }
+                return String.format("import '%s';", value);
+        }
+
+        private void assertContainsImports(boolean contains, String... imports) {
+                for (String line : imports) {
+                        boolean result = updater.resultingLines.contains("import '" + addWebpackPrefix(line) + "';");
+                        String message = "\n  " + (contains ? "NOT " : "") + "FOUND '" + line + " IN: \n"
+                                        + updater.resultingLines;
+                        if (contains) {
+                                assertTrue(message, result);
+                        } else {
+                                assertFalse(message, result);
+                        }
+                }
+        }
+
+        private void assertImportOrder(String... imports) {
+                int curIndex = -1;
+                for (String line : imports) {
+                        String prefixed = addWebpackPrefix(line);
+                        int nextIndex = updater.resultingLines.indexOf("import '" + prefixed + "';");
+                        assertTrue("import '" + prefixed + "' not found", nextIndex != -1);
+                        assertTrue("import '" + prefixed + "' appears in the wrong order", curIndex <= nextIndex);
+                        curIndex = nextIndex;
+                }
+        }
 
 }

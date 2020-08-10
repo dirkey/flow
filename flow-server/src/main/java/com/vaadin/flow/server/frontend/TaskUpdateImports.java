@@ -66,8 +66,7 @@ public class TaskUpdateImports extends NodeUpdater {
             + "document.head.insertBefore(div.firstElementChild, document.head.firstChild);";
     private static final String THEME_VARIANT_TPL = "document.documentElement.setAttribute('%s', '%s');";
     // Trim and remove new lines.
-    private static final Pattern NEW_LINE_TRIM = Pattern
-            .compile("(?m)(^\\s+|\\s?\n)");
+    private static final Pattern NEW_LINE_TRIM = Pattern.compile("(?m)(^\\s+|\\s?\n)");
 
     private final File frontendDirectory;
     private final FrontendDependenciesScanner fallbackScanner;
@@ -84,11 +83,9 @@ public class TaskUpdateImports extends NodeUpdater {
         private final File fallBackImports;
         private final ClassFinder finder;
 
-        UpdateMainImportsFile(ClassFinder classFinder, File frontendDirectory,
-                File npmDirectory, File generatedDirectory,
-                File fallBackImports, File tokenFile) {
-            super(frontendDirectory, npmDirectory, generatedDirectory,
-                    tokenFile);
+        UpdateMainImportsFile(ClassFinder classFinder, File frontendDirectory, File npmDirectory,
+                File generatedDirectory, File fallBackImports, File tokenFile) {
+            super(frontendDirectory, npmDirectory, generatedDirectory, tokenFile);
             generatedFlowImports = new File(generatedDirectory, IMPORTS_NAME);
             finder = classFinder;
             this.fallBackImports = fallBackImports;
@@ -97,11 +94,9 @@ public class TaskUpdateImports extends NodeUpdater {
         @Override
         protected void writeImportLines(List<String> lines) {
             if (fallBackImports != null) {
-                lines.add(
-                        "var scripts = document.getElementsByTagName('script');");
+                lines.add("var scripts = document.getElementsByTagName('script');");
                 lines.add("var thisScript;");
-                lines.add(
-                        "var elements = document.getElementsByTagName('script');");
+                lines.add("var elements = document.getElementsByTagName('script');");
                 lines.add("for (var i = 0; i < elements.length; i++) {");
                 lines.add("    var script = elements[i];");
                 lines.add(
@@ -110,27 +105,21 @@ public class TaskUpdateImports extends NodeUpdater {
                 lines.add("     }");
                 lines.add("}");
                 lines.add("if (!thisScript) {");
-                lines.add(
-                        "    throw new Error('Could not find the bundle script to identify the application id');");
+                lines.add("    throw new Error('Could not find the bundle script to identify the application id');");
                 lines.add("}");
                 lines.add("thisScript['vaadin-bundle'] = true;");
-                lines.add(
-                        "if (!window.Vaadin.Flow.fallbacks) { window.Vaadin.Flow.fallbacks={}; }");
+                lines.add("if (!window.Vaadin.Flow.fallbacks) { window.Vaadin.Flow.fallbacks={}; }");
                 lines.add("var fallbacks = window.Vaadin.Flow.fallbacks;");
-                lines.add(
-                        "fallbacks[thisScript.getAttribute('data-app-id')] = {}");
-                lines.add(
-                        "fallbacks[thisScript.getAttribute('data-app-id')].loadFallback = function loadFallback(){");
-                lines.add("   return import('./" + fallBackImports.getName()
-                        + "');");
+                lines.add("fallbacks[thisScript.getAttribute('data-app-id')] = {}");
+                lines.add("fallbacks[thisScript.getAttribute('data-app-id')].loadFallback = function loadFallback(){");
+                lines.add("   return import('./" + fallBackImports.getName() + "');");
                 lines.add("}");
             }
             try {
                 updateImportsFile(generatedFlowImports, lines);
             } catch (IOException e) {
-                throw new IllegalStateException(String.format(
-                        "Failed to update the Flow imports file '%s'",
-                        generatedFlowImports), e);
+                throw new IllegalStateException(
+                        String.format("Failed to update the Flow imports file '%s'", generatedFlowImports), e);
             }
         }
 
@@ -142,14 +131,11 @@ public class TaskUpdateImports extends NodeUpdater {
             if (theme != null) {
                 if (!theme.getHeaderInlineContents().isEmpty()) {
                     lines.add(THEME_PREPARE);
-                    theme.getHeaderInlineContents()
-                            .forEach(html -> addLines(lines,
-                                    String.format(THEME_LINE_TPL, NEW_LINE_TRIM
-                                            .matcher(html).replaceAll(""))));
+                    theme.getHeaderInlineContents().forEach(html -> addLines(lines,
+                            String.format(THEME_LINE_TPL, NEW_LINE_TRIM.matcher(html).replaceAll(""))));
                 }
                 theme.getHtmlAttributes(themeDef.getVariant())
-                        .forEach((key, value) -> addLines(lines,
-                                String.format(THEME_VARIANT_TPL, key, value)));
+                        .forEach((key, value) -> addLines(lines, String.format(THEME_VARIANT_TPL, key, value)));
                 lines.add("");
             }
             return lines;
@@ -158,8 +144,7 @@ public class TaskUpdateImports extends NodeUpdater {
         @Override
         protected List<String> getModules() {
             if (!additionalFrontendModules.isEmpty()) {
-                List<String> frontendModules = new ArrayList<>(
-                        frontDeps.getModules());
+                List<String> frontendModules = new ArrayList<>(frontDeps.getModules());
                 frontendModules.addAll(additionalFrontendModules);
                 return frontendModules;
             } else {
@@ -180,8 +165,7 @@ public class TaskUpdateImports extends NodeUpdater {
         @Override
         protected Collection<String> getGeneratedModules() {
             final Set<String> exclude = new HashSet<>(
-                    Arrays.asList(generatedFlowImports.getName(),
-                            FrontendUtils.FALLBACK_IMPORTS_NAME));
+                    Arrays.asList(generatedFlowImports.getName(), FrontendUtils.FALLBACK_IMPORTS_NAME));
             return NodeUpdater.getGeneratedModules(generatedFolder, exclude);
         }
 
@@ -199,9 +183,10 @@ public class TaskUpdateImports extends NodeUpdater {
         protected Set<CssData> getCss() {
             return frontDeps.getCss();
         }
+
         @Override
-        protected String getDesignSystem() {
-            return frontDeps.getDesignSystem();
+        protected String getApplicationTheme() {
+            return frontDeps.getApplicationTheme();
         }
 
         @Override
@@ -220,13 +205,10 @@ public class TaskUpdateImports extends NodeUpdater {
         private final File generatedFallBack;
         private final ClassFinder finder;
 
-        UpdateFallBackImportsFile(ClassFinder classFinder,
-                File frontendDirectory, File npmDirectory,
+        UpdateFallBackImportsFile(ClassFinder classFinder, File frontendDirectory, File npmDirectory,
                 File generatedDirectory, File tokenFile) {
-            super(frontendDirectory, npmDirectory, generatedDirectory,
-                    tokenFile);
-            generatedFallBack = new File(generatedDirectory,
-                    FrontendUtils.FALLBACK_IMPORTS_NAME);
+            super(frontendDirectory, npmDirectory, generatedDirectory, tokenFile);
+            generatedFallBack = new File(generatedDirectory, FrontendUtils.FALLBACK_IMPORTS_NAME);
             finder = classFinder;
         }
 
@@ -235,8 +217,7 @@ public class TaskUpdateImports extends NodeUpdater {
             try {
                 updateImportsFile(generatedFallBack, lines);
             } catch (IOException e) {
-                throw new IllegalStateException(String.format(
-                        "Failed to update the Flow fallback imports file '%s'",
+                throw new IllegalStateException(String.format("Failed to update the Flow fallback imports file '%s'",
                         getGeneratedFallbackFile()), e);
             }
         }
@@ -248,24 +229,23 @@ public class TaskUpdateImports extends NodeUpdater {
 
         @Override
         protected List<String> getModules() {
-            LinkedHashSet<String> set = new LinkedHashSet<>(
-                    fallbackScanner.getModules());
+            LinkedHashSet<String> set = new LinkedHashSet<>(fallbackScanner.getModules());
             set.removeAll(frontDeps.getModules());
             return new ArrayList<String>(set);
         }
 
         @Override
         protected Set<String> getScripts() {
-            LinkedHashSet<String> set = new LinkedHashSet<>(
-                    fallbackScanner.getScripts());
+            LinkedHashSet<String> set = new LinkedHashSet<>(fallbackScanner.getScripts());
             set.removeAll(frontDeps.getScripts());
             return set;
         }
 
         @Override
-        protected String getDesignSystem() {
+        protected String getApplicationTheme() {
             return null;
         }
+
         @Override
         protected URL getResource(String name) {
             return finder.getResource(name);
@@ -288,8 +268,7 @@ public class TaskUpdateImports extends NodeUpdater {
 
         @Override
         protected Set<CssData> getCss() {
-            LinkedHashSet<CssData> set = new LinkedHashSet<>(
-                    fallbackScanner.getCss());
+            LinkedHashSet<CssData> set = new LinkedHashSet<>(fallbackScanner.getCss());
             set.removeAll(frontDeps.getCss());
             return set;
         }
@@ -312,62 +291,45 @@ public class TaskUpdateImports extends NodeUpdater {
     /**
      * Create an instance of the updater given all configurable parameters.
      *
-     * @param finder
-     *            a reusable class finder
-     * @param frontendDepScanner
-     *            a reusable frontend dependencies scanner
-     * @param fallBackScannerProvider
-     *            fallback scanner provider, not {@code null}
-     * @param npmFolder
-     *            folder with the `package.json` file
-     * @param generatedPath
-     *            folder where flow generated files will be placed.
-     * @param frontendDirectory
-     *            a directory with project's frontend files
-     * @param tokenFile
-     *            the token (flow-build-info.json) path, may be {@code null}
-     * @param disablePnpm
-     *            if {@code true} then npm is used instead of pnpm, otherwise
-     *            pnpm is used
+     * @param finder                  a reusable class finder
+     * @param frontendDepScanner      a reusable frontend dependencies scanner
+     * @param fallBackScannerProvider fallback scanner provider, not {@code null}
+     * @param npmFolder               folder with the `package.json` file
+     * @param generatedPath           folder where flow generated files will be
+     *                                placed.
+     * @param frontendDirectory       a directory with project's frontend files
+     * @param tokenFile               the token (flow-build-info.json) path, may be
+     *                                {@code null}
+     * @param disablePnpm             if {@code true} then npm is used instead of
+     *                                pnpm, otherwise pnpm is used
      */
-    TaskUpdateImports(ClassFinder finder,
-            FrontendDependenciesScanner frontendDepScanner,
-            SerializableFunction<ClassFinder, FrontendDependenciesScanner> fallBackScannerProvider,
-            File npmFolder, File generatedPath, File frontendDirectory,
-            File tokenFile, boolean disablePnpm) {
-        this(finder, frontendDepScanner, fallBackScannerProvider, npmFolder,
-                generatedPath, frontendDirectory, tokenFile, null, disablePnpm,
-                Collections.emptyList());
+    TaskUpdateImports(ClassFinder finder, FrontendDependenciesScanner frontendDepScanner,
+            SerializableFunction<ClassFinder, FrontendDependenciesScanner> fallBackScannerProvider, File npmFolder,
+            File generatedPath, File frontendDirectory, File tokenFile, boolean disablePnpm) {
+        this(finder, frontendDepScanner, fallBackScannerProvider, npmFolder, generatedPath, frontendDirectory,
+                tokenFile, null, disablePnpm, Collections.emptyList());
     }
 
     /**
      * Create an instance of the updater given all configurable parameters.
      *
-     * @param finder
-     *            a reusable class finder
-     * @param frontendDepScanner
-     *            a reusable frontend dependencies scanner
-     * @param fallBackScannerProvider
-     *            fallback scanner provider, not {@code null}
-     * @param npmFolder
-     *            folder with the `package.json` file
-     * @param generatedPath
-     *            folder where flow generated files will be placed.
-     * @param frontendDirectory
-     *            a directory with project's frontend files
-     * @param tokenFile
-     *            the token (flow-build-info.json) path, may be {@code null}
-     * @param tokenFileData
-     *            object to fill with token file data, may be {@code null}
-     * @param disablePnpm
-     *            if {@code true} then npm is used instead of pnpm, otherwise
-     *            pnpm is used
+     * @param finder                  a reusable class finder
+     * @param frontendDepScanner      a reusable frontend dependencies scanner
+     * @param fallBackScannerProvider fallback scanner provider, not {@code null}
+     * @param npmFolder               folder with the `package.json` file
+     * @param generatedPath           folder where flow generated files will be
+     *                                placed.
+     * @param frontendDirectory       a directory with project's frontend files
+     * @param tokenFile               the token (flow-build-info.json) path, may be
+     *                                {@code null}
+     * @param tokenFileData           object to fill with token file data, may be
+     *                                {@code null}
+     * @param disablePnpm             if {@code true} then npm is used instead of
+     *                                pnpm, otherwise pnpm is used
      */
-    TaskUpdateImports(ClassFinder finder,
-            FrontendDependenciesScanner frontendDepScanner,
-            SerializableFunction<ClassFinder, FrontendDependenciesScanner> fallBackScannerProvider,
-            File npmFolder, File generatedPath, File frontendDirectory,
-            File tokenFile, JsonObject tokenFileData, boolean disablePnpm,
+    TaskUpdateImports(ClassFinder finder, FrontendDependenciesScanner frontendDepScanner,
+            SerializableFunction<ClassFinder, FrontendDependenciesScanner> fallBackScannerProvider, File npmFolder,
+            File generatedPath, File frontendDirectory, File tokenFile, JsonObject tokenFileData, boolean disablePnpm,
             List<String> additionalFrontendModules) {
         super(finder, frontendDepScanner, npmFolder, generatedPath);
         this.frontendDirectory = frontendDirectory;
@@ -383,17 +345,15 @@ public class TaskUpdateImports extends NodeUpdater {
     public void execute() {
         File fallBack = null;
         if (fallbackScanner != null) {
-            UpdateFallBackImportsFile fallBackUpdate = new UpdateFallBackImportsFile(
-                    finder, frontendDirectory, npmFolder, generatedFolder,
-                    tokenFile);
+            UpdateFallBackImportsFile fallBackUpdate = new UpdateFallBackImportsFile(finder, frontendDirectory,
+                    npmFolder, generatedFolder, tokenFile);
             fallBackUpdate.run();
             fallBack = fallBackUpdate.getGeneratedFallbackFile();
             updateBuildFile(fallBackUpdate);
         }
 
-        UpdateMainImportsFile mainUpdate = new UpdateMainImportsFile(finder,
-                frontendDirectory, npmFolder, generatedFolder, fallBack,
-                tokenFile);
+        UpdateMainImportsFile mainUpdate = new UpdateMainImportsFile(finder, frontendDirectory, npmFolder,
+                generatedFolder, fallBack, tokenFile);
         mainUpdate.run();
     }
 
@@ -407,8 +367,9 @@ public class TaskUpdateImports extends NodeUpdater {
         }
         def = fallbackScanner.getThemeDefinition();
         if (def != null && log().isDebugEnabled()) {
-            log().debug("Theme definition is discovered by the fallback "
-                    + "scanner and not discovered by the main scanner. Theme '{}' will be used",
+            log().debug(
+                    "Theme definition is discovered by the fallback "
+                            + "scanner and not discovered by the main scanner. Theme '{}' will be used",
                     def.getTheme().getName());
         }
         return def;
@@ -428,18 +389,14 @@ public class TaskUpdateImports extends NodeUpdater {
     private void updateBuildFile(AbstractUpdateImports updater) {
         boolean tokenFileExists = tokenFile != null && tokenFile.exists();
         if (!tokenFileExists) {
-            log().warn(
-                    "Token file is not available. Fallback chunk data won't be written.");
+            log().warn("Token file is not available. Fallback chunk data won't be written.");
         }
         try {
             if (tokenFileExists) {
-                String json = FileUtils.readFileToString(tokenFile,
-                        StandardCharsets.UTF_8);
-                JsonObject buildInfo = json.isEmpty() ? Json.createObject()
-                        : JsonUtil.parse(json);
+                String json = FileUtils.readFileToString(tokenFile, StandardCharsets.UTF_8);
+                JsonObject buildInfo = json.isEmpty() ? Json.createObject() : JsonUtil.parse(json);
                 populateFallbackData(buildInfo, updater);
-                FileUtils.write(tokenFile, JsonUtil.stringify(buildInfo, 2),
-                        StandardCharsets.UTF_8);
+                FileUtils.write(tokenFile, JsonUtil.stringify(buildInfo, 2), StandardCharsets.UTF_8);
             }
 
         } catch (IOException e) {
@@ -450,12 +407,10 @@ public class TaskUpdateImports extends NodeUpdater {
         }
     }
 
-    private void populateFallbackData(JsonObject object,
-            AbstractUpdateImports updater) {
+    private void populateFallbackData(JsonObject object, AbstractUpdateImports updater) {
         JsonObject fallback = Json.createObject();
         fallback.put(FrontendUtils.JS_MODULES, makeFallbackModules(updater));
-        fallback.put(FrontendUtils.CSS_IMPORTS,
-                makeFallbackCssImports(updater));
+        fallback.put(FrontendUtils.CSS_IMPORTS, makeFallbackCssImports(updater));
 
         JsonObject chunks = Json.createObject();
         chunks.put(FrontendUtils.FALLBACK, fallback);

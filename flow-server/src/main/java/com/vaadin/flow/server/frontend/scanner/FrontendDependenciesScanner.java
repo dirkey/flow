@@ -107,7 +107,7 @@ public interface FrontendDependenciesScanner extends Serializable {
      */
     AbstractTheme getTheme();
 
-    String getDesignSystem();
+    String getApplicationTheme();
 
     /**
      * Get all Java classes considered when looking for used dependencies.
